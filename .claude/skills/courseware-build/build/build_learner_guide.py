@@ -500,3 +500,13 @@ for a in ACT:
 
 open(os.path.join(ACTROOT, "README.md"), "w").write("".join(index))
 print("Saved", len(ACT), "activity folders under", ACTROOT)
+
+# Mirror the activity briefs into labs/activities/ as well. gdrive_push syncs the
+# labs/ tree into the Drive "Activities" folder and nothing else — without this
+# mirror the briefs are built locally but never reach Drive or the LMS.
+import shutil
+LABS_MIRROR = os.path.join(REPO, "labs", "activities")
+if os.path.isdir(LABS_MIRROR):
+    shutil.rmtree(LABS_MIRROR)
+shutil.copytree(ACTROOT, LABS_MIRROR)
+print("Mirrored activity briefs into", LABS_MIRROR)
