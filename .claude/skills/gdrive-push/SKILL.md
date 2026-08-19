@@ -168,3 +168,30 @@ server-side move to Archive (`moveto`) — there is no delete anywhere.
   in the browser (use the account that owns the courseware folder).
 - The `--drive-root-folder-id` flag scopes every call to the user-supplied folder,
   so the script cannot touch anything outside it.
+
+## Archiving is total — files AND folders
+
+Every push leaves the Drive folder showing **only the current courseware**. Anything
+superseded goes to `archive/`; nothing is ever deleted.
+
+| On Drive | What happens |
+|---|---|
+| A file the repo replaces | moved to `archive/` (rclone `--backup-dir`) |
+| A **folder** the repo no longer owns, still holding files | moved wholesale to `archive/` |
+| A **folder** left empty by the sync | purged — its files are already in `archive/` |
+| `archive/` itself | never touched |
+
+**Why the folder rule exists.** `rclone sync --backup-dir` relocates superseded
+*files* but leaves the *directories* that held them behind. On the InDesign course
+that stranded seven retired trainer folders (`1 Exercise Files`, `Package`,
+`flower arrangement Folder`, …) at the top level as empty shells — the push reported
+success while the folder still looked stale to anyone browsing it. `sweep_stale_dirs()`
+closes that gap by sweeping the directory level after the file sync.
+
+**The keep-set is the local tree.** Directories present in `labs/` are kept; everything
+else at that level is superseded. So retiring an activity is just deleting it locally —
+the next push archives the Drive copy for you.
+
+**Mirror your tree flat.** The `labs/` tree maps 1:1 onto the Drive Activities folder,
+so a nested `labs/activities/` surfaces as `Activities/activities/…` and reads as a
+duplicate folder. Generated per-activity briefs belong at `labs/activity-NN-*/`.

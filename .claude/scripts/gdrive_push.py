@@ -150,6 +150,49 @@ def push_folder(root, folder_path, files, dry):
             print(f"      view link (anyone with the link): {link}")
 
 
+def sweep_stale_dirs(root, folder_path, keep_names, arch_name, dry):
+    """Move whole leftover DIRECTORIES into archive/ and purge empty skeletons.
+
+    `rclone sync --backup-dir` relocates superseded FILES, but it leaves the
+    directories that held them behind — so a retired folder lingers at the top level
+    as an empty shell forever, which is exactly how a Drive folder ends up looking
+    stale even after a successful push. This sweeps the directory level too:
+
+      * a directory that still holds files  -> moved wholesale into archive/
+      * a directory left empty by the sync  -> purged (its files are already in
+        archive/, moved there by --backup-dir, so nothing is lost)
+
+    `keep_names` is the set of directories the local tree legitimately owns; anything
+    else at the top level is superseded material.
+    """
+    stale = [d["Name"] for d in list_dirs(root, folder_path)
+             if d["Name"] not in keep_names
+             and not d["Name"].strip().lower().startswith("archiv")]
+    if not stale:
+        return
+    for name in sorted(stale):
+        src = f"{REMOTE}:{folder_path}/{name}"
+        try:
+            n_files = len([l for l in rc(["lsf", src, "-R", "--files-only"], root).splitlines() if l.strip()])
+        except SystemExit:
+            n_files = -1          # unreadable: treat as non-empty and archive it
+        if n_files == 0:
+            print(f"    purge:   {name}/  (empty — its files are already in {arch_name}/)")
+            if not dry:
+                try:
+                    rc(["purge", src], root)
+                except SystemExit as e:
+                    print(f"      WARNING: could not purge '{name}' — {str(e)[:160]}; continuing")
+        else:
+            label = f"{n_files} file(s)" if n_files > 0 else "unreadable"
+            print(f"    archive: {name}/  ->  {arch_name}/  ({label})")
+            if not dry:
+                try:
+                    rc(["moveto", src, f"{REMOTE}:{folder_path}/{arch_name}/{name}"], root)
+                except SystemExit as e:
+                    print(f"      WARNING: could not archive '{name}' — {str(e)[:160]}; continuing")
+
+
 def push_labs(root, labs_dir, dry):
     folder_path, real_name, created = find_or_create_dir(root, "", "Activities", "activit", dry)
     arch_name = "archive"
@@ -184,6 +227,9 @@ def push_labs(root, labs_dir, dry):
         print(f"    upload:  {name}")
     print(f"    labs sync: {len(set(copied))} file(s) uploaded, {len(set(moved))} archived "
           f"(unchanged files skipped automatically)")
+    # The file sync leaves retired DIRECTORIES behind; sweep them into archive/ too.
+    keep = {n for n in os.listdir(labs_dir) if os.path.isdir(os.path.join(labs_dir, n))}
+    sweep_stale_dirs(root, folder_path, keep, arch_name, dry)
 
 
 def newest(pattern):
