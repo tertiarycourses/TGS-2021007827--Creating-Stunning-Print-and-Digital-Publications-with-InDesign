@@ -1,0 +1,19 @@
+# ── Confidential — assessment papers and answer keys are Drive-only, NEVER GitHub
+assessment/
+
+# ── Secrets
+.env
+*.key
+lms_tms_api_key
+
+# ── Bulky source material kept locally only
+reference/
+courseware/assets/screens/
+labs/files/
+
+# ── OS / editor / build noise
+.DS_Store
+__pycache__/
+*.pyc
+~$*
+*.zip
