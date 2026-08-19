@@ -501,12 +501,25 @@ for a in ACT:
 open(os.path.join(ACTROOT, "README.md"), "w").write("".join(index))
 print("Saved", len(ACT), "activity folders under", ACTROOT)
 
-# Mirror the activity briefs into labs/activities/ as well. gdrive_push syncs the
-# labs/ tree into the Drive "Activities" folder and nothing else — without this
-# mirror the briefs are built locally but never reach Drive or the LMS.
-import shutil
-LABS_MIRROR = os.path.join(REPO, "labs", "activities")
-if os.path.isdir(LABS_MIRROR):
-    shutil.rmtree(LABS_MIRROR)
-shutil.copytree(ACTROOT, LABS_MIRROR)
-print("Mirrored activity briefs into", LABS_MIRROR)
+# Mirror the activity briefs into the labs/ tree. gdrive_push syncs labs/ into the
+# Drive "Activities" folder and nothing else, so without this the briefs are built
+# locally but never reach Drive or the LMS.
+#
+# They are mirrored FLAT (labs/activity-NN-*/), not under labs/activities/, because
+# the sync tree maps 1:1 onto the Drive folder — a nested "activities" directory
+# would surface as Activities/activities/activity-NN-*, which reads as a duplicate
+# folder to anyone browsing Drive.
+import shutil, glob as _glob
+LABS = os.path.join(REPO, "labs")
+for _old in _glob.glob(os.path.join(LABS, "activity-*")):
+    if os.path.isdir(_old):
+        shutil.rmtree(_old)
+_nested = os.path.join(LABS, "activities")
+if os.path.isdir(_nested):
+    shutil.rmtree(_nested)
+_n = 0
+for _d in sorted(os.listdir(ACTROOT)):
+    _src = os.path.join(ACTROOT, _d)
+    if os.path.isdir(_src):
+        shutil.copytree(_src, os.path.join(LABS, _d)); _n += 1
+print(f"Mirrored {_n} activity briefs flat into {LABS}")
