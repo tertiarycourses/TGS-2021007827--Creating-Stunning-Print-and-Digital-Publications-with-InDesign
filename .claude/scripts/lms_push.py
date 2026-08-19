@@ -165,12 +165,41 @@ def share_link(root, path, file_id):
     return f"https://drive.google.com/file/d/{file_id}/view?usp=sharing"
 
 
+def _current_deck_stem():
+    """The stem of the deck this repo just built, e.g.
+    'Creating Stunning Print and Digital Publications with InDesign-v12.0'.
+    Used so the LMS links the CURRENT deck rather than a legacy 'Master ...' file."""
+    import glob as _glob
+    here = os.path.dirname(os.path.abspath(__file__))
+    for _ in range(6):
+        cw = os.path.join(here, "courseware")
+        if os.path.isdir(cw):
+            decks = sorted(_glob.glob(os.path.join(cw, "*.pptx")), key=os.path.getmtime, reverse=True)
+            decks = [d for d in decks if not os.path.basename(d).startswith("~$")]
+            if decks:
+                return os.path.splitext(os.path.basename(decks[0]))[0]
+            return ""
+        here = os.path.dirname(here)
+    return ""
+CURRENT_DECK_STEM = _current_deck_stem()
+
+
 def pick(files, pred, prefer=None):
-    """Best match: those satisfying `prefer` win; ties broken by newest ModTime."""
+    """Best match: highest `prefer` RANK wins; ties broken by newest ModTime.
+
+    `prefer` may return a bool or an int rank. A rank matters when more than one
+    candidate is "preferred" for different reasons — e.g. the current build and a
+    legacy file whose name happens to contain "Master". Collapsing both to True
+    let ModTime decide, which republished the OLD deck whenever the legacy file had
+    been touched more recently.
+    """
     hits = [f for f in files if pred(f["Name"])]
     if not hits:
         return None, []
-    hits.sort(key=lambda f: (bool(prefer and prefer(f["Name"])), f.get("ModTime", "")), reverse=True)
+    def rank(f):
+        r = prefer(f["Name"]) if prefer else 0
+        return int(r) if not isinstance(r, bool) else (1 if r else 0)
+    hits.sort(key=lambda f: (rank(f), f.get("ModTime", "")), reverse=True)
     return hits[0], hits
 
 
@@ -208,10 +237,16 @@ def collect_links(root):
             print(f"  ! {len(hits)} candidates for {what} in '{d}' — using '{f['Name']}' (not: {others})")
         out[field] = (f["Name"], share_link(root, f"{d}/{f['Name']}", f["ID"]))
 
-    # Trainer deck: the PPT. Prefer the "Master Trainer Slides" copy over a
-    # trainer-personalised one (e.g. "WSQ - Dr. Alfred Ang - ....pptx").
+    # Trainer deck: the PPT. The "master" preference exists to skip a
+    # trainer-PERSONALISED copy (e.g. "WSQ - Dr. Alfred Ang - ....pptx"), but on its own
+    # it also outranks the CURRENT build whenever a legacy file happens to be named
+    # "... Master Trainer Slides ... v11.pptx" — which silently republishes the old deck.
+    # So the deck whose filename carries the version we just built wins outright, and
+    # "master" only breaks ties among the rest.
+    _cur = (CURRENT_DECK_STEM or "").lower()
     take("trainerSlidesUrl", "trainer_slides", lambda n: n.lower().endswith(".pptx"),
-         "trainer slides .pptx", prefer=lambda n: "master" in n.lower())
+         "trainer slides .pptx",
+         prefer=lambda n: 2 if (_cur and _cur in n.lower()) else (1 if "master" in n.lower() else 0))
     # Both learner artifacts live in the Learner Guide folder: the Learner Guide document
     # and the slide deck PDF. Anything that is not the guide is the deck.
     take("slidesUrl", "learner_guide", lambda n: pdf(n) and not is_learner_guide(n), "learner slides .pdf")
