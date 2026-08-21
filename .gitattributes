@@ -1,0 +1,12 @@
+*.indd filter=lfs diff=lfs merge=lfs -text
+*.indt filter=lfs diff=lfs merge=lfs -text
+*.mp4 filter=lfs diff=lfs merge=lfs -text
+*.pdf binary
+*.pptx binary
+*.docx binary
+*.ai binary
+*.idml binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+labs/**/TableData.txt binary

@@ -10,6 +10,16 @@ lms_tms_api_key
 reference/
 courseware/assets/screens/
 labs/files/
+courseware/archive/
+
+# ── Private build and QA tooling
+.claude/
+.codex/
+tmp/
+qa/
+qa-*/
+QA-*.md
+COURSEWARE-QA-*.md
 
 # ── OS / editor / build noise
 .DS_Store
